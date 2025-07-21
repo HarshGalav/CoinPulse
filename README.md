@@ -1,36 +1,190 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CoinPulse - Real-Time Crypto Tracker
 
-## Getting Started
+A comprehensive Next.js web application for tracking cryptocurrency prices in real-time, setting price alerts, and managing your crypto portfolio with advanced charting and analysis tools.
 
-First, run the development server:
+## Features
 
-```bash
+- 🚀 **Real-time Crypto Data**: Powered by CoinGecko API
+- 🔔 **Price Alerts**: Set one-time or recurring price alerts
+- 📧 **Email Notifications**: Get notified via email when alerts trigger
+- 📊 **Interactive Charts**: View price trends with Recharts
+- 🔍 **Search Functionality**: Find any cryptocurrency quickly
+- 🌙 **Dark/Light Mode**: Toggle between themes
+- 💱 **Multi-Currency Support**: USD, EUR, INR, GBP, JPY
+- 🔐 **Google Authentication**: Secure login with NextAuth.js
+- 📱 **Responsive Design**: Works on all devices
+- 🔥 **Firebase Integration**: Store alerts and notifications
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **Authentication**: NextAuth.js with Google OAuth
+- **Database**: Firebase Firestore
+- **Charts**: Recharts
+- **Email**: Resend API
+- **Notifications**: react-hot-toast
+- **API**: CoinGecko API
+
+## Setup Instructions
+
+### 1. Clone the Repository
+
+\`\`\`bash
+git clone <your-repo-url>
+cd coinpulse
+\`\`\`
+
+### 2. Install Dependencies
+
+\`\`\`bash
+npm install
+\`\`\`
+
+### 3. Environment Variables
+
+Create a \`.env.local\` file in the root directory with the following variables:
+
+\`\`\`env
+# NextAuth Configuration
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret-here
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+
+# Firebase Admin (Server-side)
+FIREBASE_PRIVATE_KEY=your-firebase-private-key
+FIREBASE_CLIENT_EMAIL=your-firebase-client-email
+
+# Resend API
+RESEND_API_KEY=your-resend-api-key
+
+# CoinGecko API (optional - has rate limits without key)
+COINGECKO_API_KEY=your-coingecko-api-key
+\`\`\`
+
+### 4. Setup Services
+
+#### Google OAuth Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials
+5. Add authorized redirect URIs: \`http://localhost:3000/api/auth/callback/google\`
+
+#### Firebase Setup
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project
+3. Enable Firestore Database
+4. Create a service account and download the private key
+5. Enable Authentication with Google provider
+
+#### Resend Setup
+1. Sign up at [Resend](https://resend.com/)
+2. Get your API key
+3. Verify your domain (for production)
+
+#### CoinGecko API (Optional)
+1. Sign up at [CoinGecko](https://www.coingecko.com/en/api)
+2. Get your free API key for higher rate limits
+
+### 5. Run the Development Server
+
+\`\`\`bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+\`\`\`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 6. Setup Alert Checking (Production)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+For production, set up a cron job or scheduled function to check alerts:
 
-## Learn More
+\`\`\`bash
+# Add to your crontab to check alerts every 5 minutes
+*/5 * * * * curl -X POST https://your-domain.com/api/alerts/check
+\`\`\`
 
-To learn more about Next.js, take a look at the following resources:
+Or use Vercel Cron Jobs:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+\`\`\`json
+{
+  "crons": [
+    {
+      "path": "/api/alerts/check",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
+\`\`\`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Usage
 
-## Deploy on Vercel
+1. **Browse Cryptocurrencies**: View top cryptocurrencies with real-time prices
+2. **Search**: Use the search bar to find specific coins
+3. **Set Alerts**: Click "Set Alert" on any coin to create price alerts
+4. **View Charts**: Click "View Details" to see price charts
+5. **Manage Currency**: Change your preferred currency from the header
+6. **Theme Toggle**: Switch between dark and light modes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+\`\`\`
+├── app/
+│   ├── api/
+│   │   ├── auth/[...nextauth]/
+│   │   ├── alerts/
+│   │   ├── crypto/
+│   │   └── notifications/
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── ui/
+│   ├── AlertDialog.tsx
+│   ├── CoinCard.tsx
+│   ├── CoinSearch.tsx
+│   └── PriceChart.tsx
+├── lib/
+│   ├── coingecko.ts
+│   ├── firebase.ts
+│   ├── firebase-admin.ts
+│   └── utils.ts
+└── ...
+\`\`\`
+
+## API Endpoints
+
+- \`GET /api/crypto/coins\` - Get cryptocurrency list
+- \`GET /api/crypto/search\` - Search cryptocurrencies
+- \`GET /api/alerts\` - Get user alerts
+- \`POST /api/alerts\` - Create new alert
+- \`DELETE /api/alerts\` - Delete alert
+- \`POST /api/alerts/check\` - Check and trigger alerts
+- \`GET /api/notifications\` - Get notification history
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Support
+
+For support, email support@yourapp.com or create an issue on GitHub.
