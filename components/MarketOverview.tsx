@@ -287,6 +287,7 @@ export function MarketOverview({
                   return (
                     <tr
                       key={coin.id}
+                      id={`coin-${coin.id}`}
                       className="border-b hover:bg-muted/20 transition-colors cursor-pointer group"
                       onClick={() => onCoinSelect(coin)}
                     >

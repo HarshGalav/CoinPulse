@@ -78,6 +78,8 @@ export default function Home() {
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
+
+
   // Real Binance WebSocket for live cryptocurrency data
   const { 
     prices: binancePrices, 
@@ -193,15 +195,60 @@ export default function Home() {
     setShowAlertDialog(true);
   };
 
-  const handleViewDetails = (coin: CoinData) => {
+  const handleViewDetails = useCallback((coin: CoinData) => {
     setSelectedCoin(coin);
     setShowChart(true);
-  };
+  }, []);
+
+  const handleCoinSelectFromSearch = useCallback((coinId: string) => {
+    // Find the coin in the current coins list
+    const coin = filteredCoins.find(c => c.id === coinId);
+    if (coin) {
+      handleViewDetails(coin);
+    } else {
+      // If coin not found in current list, try to find it in the full coins list
+      const fullCoin = coins.find(c => c.id === coinId);
+      if (fullCoin) {
+        handleViewDetails(fullCoin);
+      } else {
+        // If still not found, we could fetch it from the API or show a message
+        console.log(`Coin ${coinId} not found in current data`);
+        // For now, let's scroll to it if it exists in the DOM
+        setTimeout(() => {
+          const element = document.getElementById(`coin-${coinId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('bg-primary/10', 'ring-2', 'ring-primary/50');
+            setTimeout(() => {
+              element.classList.remove('bg-primary/10', 'ring-2', 'ring-primary/50');
+            }, 3000);
+            // Try to click on the row to open the chart
+            element.click();
+          }
+        }, 100);
+      }
+    }
+  }, [filteredCoins, coins, handleViewDetails]);
 
   const toggleRealtimeData = () => {
     setRealtimeEnabled(!realtimeEnabled);
     toast.success(realtimeEnabled ? 'Real-time data disabled' : 'Real-time data enabled');
   };
+
+  // Handle search from URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchCoinId = urlParams.get('search');
+    
+    if (searchCoinId && !isLoading && filteredCoins.length > 0) {
+      // Try to open the chart modal for the searched coin
+      handleCoinSelectFromSearch(searchCoinId);
+      
+      // Clean up the URL parameter
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [isLoading, filteredCoins, handleCoinSelectFromSearch]);
 
   if (status === 'loading') {
     return (
@@ -225,7 +272,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/5">
-      <Navbar currentPage="markets" />
+      <Navbar 
+        currentPage="markets" 
+        onCoinSelect={handleCoinSelectFromSearch}
+        availableCoins={filteredCoins.map(coin => ({
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          image: coin.image
+        }))}
+      />
       
       <main className="container mx-auto px-4 py-6">
         {/* Market Controls */}
