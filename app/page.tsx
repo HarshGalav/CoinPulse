@@ -10,7 +10,9 @@ import { AlertDialog } from '@/components/AlertDialog';
 import { LandingPage } from '@/components/LandingPage';
 import { Navbar } from '@/components/Navbar';
 import { MarketOverview } from '@/components/MarketOverview';
+import { BinanceConnectionStatus } from '@/components/BinanceConnectionStatus';
 import { CoinData } from '@/lib/coingecko';
+import { useRealBinanceWebSocket } from '@/lib/real-binance-websocket';
 import { 
   RefreshCw,
   X,
@@ -75,6 +77,17 @@ export default function Home() {
   const [updateInterval, setUpdateInterval] = useState(30000);
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // Real Binance WebSocket for live cryptocurrency data
+  const { 
+    prices: binancePrices, 
+    isConnected: binanceConnected, 
+    lastUpdate: binanceLastUpdate, 
+    error: binanceError,
+    reconnect: binanceReconnect,
+    connectionAttempts,
+    maxAttempts
+  } = useRealBinanceWebSocket();
 
   const applyFilters = useCallback((coinData: CoinData[], filter: string) => {
     if (!Array.isArray(coinData)) {
@@ -320,6 +333,21 @@ export default function Home() {
             </Button>
           </div>
         </div>
+
+        {/* Binance WebSocket Connection Status */}
+        {realtimeEnabled && (
+          <div className="mb-6">
+            <BinanceConnectionStatus
+              isConnected={binanceConnected}
+              lastUpdate={binanceLastUpdate}
+              error={binanceError}
+              connectionAttempts={connectionAttempts}
+              maxAttempts={maxAttempts}
+              onReconnect={binanceReconnect}
+              priceCount={binancePrices.length}
+            />
+          </div>
+        )}
 
         {/* Market Overview */}
         <MarketOverview
