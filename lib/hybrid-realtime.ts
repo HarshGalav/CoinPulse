@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRealBinanceWebSocket } from "./real-binance-websocket";
+import { useUltimateBinanceRealtime } from "./ultimate-binance-realtime";
 import { useRealCoinGeckoData } from "./real-coingecko-realtime";
 
 export interface HybridCoinPrice {
@@ -21,8 +21,8 @@ export function useHybridRealtime(page: number = 0) {
     null
   );
 
-  // Try Binance WebSocket first
-  const binanceData = useRealBinanceWebSocket(page);
+  // Use ultimate Binance real-time solution (WebSocket + intelligent fallback)
+  const binanceData = useUltimateBinanceRealtime(page);
 
   // CoinGecko as backup (also real data)
   const coingeckoData = useRealCoinGeckoData();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRealBinanceWebSocket } from "@/lib/real-binance-websocket";
+import { useSimpleCrypto } from "@/lib/hooks/use-simple-crypto";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,18 +13,23 @@ export function PaginatedCryptoList() {
     lastUpdate, 
     error, 
     totalPages,
-    reconnect 
-  } = useRealBinanceWebSocket(currentPage);
+    reconnect,
+    switchPage
+  } = useSimpleCrypto({ page: currentPage });
 
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1);
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      switchPage(newPage);
     }
   };
 
   const handlePrevPage = () => {
     if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      switchPage(newPage);
     }
   };
 

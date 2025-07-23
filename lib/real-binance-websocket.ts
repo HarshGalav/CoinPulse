@@ -189,13 +189,35 @@ export function useRealBinanceWebSocket(page: number = 0) {
           setIsConnected(false);
         }, delay);
       } else if (reconnectAttempts.current >= maxReconnectAttempts) {
-        setError("Failed to connect after multiple attempts. Please check your internet connection.");
+        setError("Failed to connect to Binance WebSocket after multiple attempts. This might be due to network restrictions or API limits. The app will continue to work with periodic updates from CoinGecko.");
       }
     };
 
     ws.onerror = (error) => {
       console.error(`${connectionName} - WebSocket error:`, error);
-      setError(`WebSocket connection error (${connectionName})`);
+      console.error(`${connectionName} - WebSocket readyState:`, ws.readyState);
+      console.error(`${connectionName} - WebSocket URL:`, ws.url);
+      
+      // More specific error handling based on ready state
+      let errorMessage = `WebSocket connection error (${connectionName}). `;
+      switch (ws.readyState) {
+        case WebSocket.CONNECTING:
+          errorMessage += "Connection failed during handshake. This might be due to CORS restrictions or network issues.";
+          break;
+        case WebSocket.OPEN:
+          errorMessage += "Connection error during active session.";
+          break;
+        case WebSocket.CLOSING:
+          errorMessage += "Connection error while closing.";
+          break;
+        case WebSocket.CLOSED:
+          errorMessage += "Connection is closed. This might be due to network issues or API restrictions.";
+          break;
+        default:
+          errorMessage += "Unknown connection state.";
+      }
+      
+      setError(errorMessage);
     };
   }, [updatePrice]);
 
@@ -219,34 +241,44 @@ export function useRealBinanceWebSocket(page: number = 0) {
         const streams1 = batch1.map(
           (symbol) => `${symbol.toLowerCase()}@ticker`
         );
-        const wsUrl1 = `wss://stream.binance.com:9443/stream?streams=${streams1.join(
-          "/"
-        )}`;
+        
+        // Use the standard Binance WebSocket endpoint without port
+        const wsUrl1 = `wss://stream.binance.com/stream?streams=${streams1.join("/")}`;
         console.log("WebSocket URL 1:", wsUrl1);
 
-        wsRef.current = new WebSocket(wsUrl1);
-        setupWebSocketHandlers(wsRef.current, "Connection 1");
+        try {
+          wsRef.current = new WebSocket(wsUrl1);
+          setupWebSocketHandlers(wsRef.current, "Connection 1");
+        } catch (wsError) {
+          console.error("Failed to create WebSocket 1:", wsError);
+          setError(`Failed to create WebSocket connection: ${wsError}`);
+          return;
+        }
       }
 
-      // Connect second batch
+      // Connect second batch with delay
       if (batch2.length > 0) {
         const streams2 = batch2.map(
           (symbol) => `${symbol.toLowerCase()}@ticker`
         );
-        const wsUrl2 = `wss://stream.binance.com:9443/stream?streams=${streams2.join(
-          "/"
-        )}`;
+        const wsUrl2 = `wss://stream.binance.com/stream?streams=${streams2.join("/")}`;
         console.log("WebSocket URL 2:", wsUrl2);
 
         // Small delay to avoid overwhelming the server
         setTimeout(() => {
-          wsRef2.current = new WebSocket(wsUrl2);
-          setupWebSocketHandlers(wsRef2.current, "Connection 2");
-        }, 100);
+          try {
+            wsRef2.current = new WebSocket(wsUrl2);
+            setupWebSocketHandlers(wsRef2.current, "Connection 2");
+          } catch (wsError) {
+            console.error("Failed to create WebSocket 2:", wsError);
+            // Don't fail completely if second connection fails
+            console.warn("Second WebSocket connection failed, continuing with first connection only");
+          }
+        }, 500); // Increased delay
       }
     } catch (err) {
       console.error("Failed to create WebSocket connections:", err);
-      setError("Failed to initialize WebSocket connections");
+      setError(`Failed to initialize WebSocket connections: ${err}`);
       setIsConnected(false);
     }
   }, [setupWebSocketHandlers, page]);

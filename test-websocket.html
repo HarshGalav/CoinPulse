@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Binance WebSocket Test</title>
+</head>
+<body>
+    <h1>Binance WebSocket Connection Test</h1>
+    <div id="status">Testing...</div>
+    <div id="data"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const dataDiv = document.getElementById('data');
+        
+        console.log('Testing Binance WebSocket connection...');
+        statusDiv.innerHTML = 'Connecting to Binance WebSocket...';
+
+        const ws = new WebSocket('wss://stream.binance.com/stream?streams=btcusdt@ticker');
+
+        ws.onopen = () => {
+            console.log('✅ WebSocket connected successfully!');
+            statusDiv.innerHTML = '✅ Connected to Binance WebSocket';
+            statusDiv.style.color = 'green';
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('📊 Received data:', data);
+                
+                if (data.stream && data.data) {
+                    const ticker = data.data;
+                    dataDiv.innerHTML = `
+                        <h3>Live Bitcoin Price:</h3>
+                        <p><strong>Price:</strong> $${parseFloat(ticker.c).toLocaleString()}</p>
+                        <p><strong>24h Change:</strong> ${ticker.P}%</p>
+                        <p><strong>High:</strong> $${parseFloat(ticker.h).toLocaleString()}</p>
+                        <p><strong>Low:</strong> $${parseFloat(ticker.l).toLocaleString()}</p>
+                        <p><strong>Volume:</strong> ${parseFloat(ticker.v).toLocaleString()}</p>
+                        <p><strong>Last Update:</strong> ${new Date().toLocaleTimeString()}</p>
+                    `;
+                }
+            } catch (err) {
+                console.error('Error parsing data:', err);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.log('❌ WebSocket error:', error);
+            statusDiv.innerHTML = '❌ WebSocket connection failed';
+            statusDiv.style.color = 'red';
+        };
+
+        ws.onclose = (event) => {
+            console.log('🔌 WebSocket closed:', event.code, event.reason);
+            statusDiv.innerHTML = `🔌 WebSocket closed (${event.code})`;
+            statusDiv.style.color = 'orange';
+        };
+
+        // Timeout test
+        setTimeout(() => {
+            if (ws.readyState === WebSocket.CONNECTING) {
+                console.log('⏰ Connection timeout');
+                statusDiv.innerHTML = '⏰ Connection timeout';
+                statusDiv.style.color = 'red';
+                ws.close();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

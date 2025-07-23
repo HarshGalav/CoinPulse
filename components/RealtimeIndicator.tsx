@@ -21,6 +21,7 @@ interface RealtimeIndicatorProps {
   onToggle: () => void;
   enabled: boolean;
   priceChanges?: number; // Number of price changes in last update
+  connectionMethod?: 'websocket' | 'polling'; // Connection method indicator
 }
 
 export function RealtimeIndicator({ 
@@ -29,7 +30,8 @@ export function RealtimeIndicator({
   updateInterval, 
   onToggle, 
   enabled,
-  priceChanges = 0
+  priceChanges = 0,
+  connectionMethod = 'websocket'
 }: RealtimeIndicatorProps) {
   const [timeAgo, setTimeAgo] = useState<string>('');
 
@@ -70,7 +72,9 @@ export function RealtimeIndicator({
 
   const getStatusText = () => {
     if (!enabled) return 'Static';
-    if (isConnected) return 'Live';
+    if (isConnected) {
+      return connectionMethod === 'websocket' ? 'Live (WS)' : 'Live (API)';
+    }
     return 'Offline';
   };
 
@@ -117,6 +121,15 @@ export function RealtimeIndicator({
             <Badge variant="secondary" className="flex items-center space-x-1">
               <TrendingUp className="w-3 h-3" />
               <span>{priceChanges} updates</span>
+            </Badge>
+          )}
+          
+          {enabled && isConnected && (
+            <Badge 
+              variant={connectionMethod === 'websocket' ? 'default' : 'secondary'} 
+              className="text-xs"
+            >
+              {connectionMethod === 'websocket' ? 'WebSocket' : 'REST API'}
             </Badge>
           )}
         </div>

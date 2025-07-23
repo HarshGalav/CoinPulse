@@ -21,6 +21,7 @@ interface BinanceConnectionStatusProps {
   maxAttempts: number;
   onReconnect: () => void;
   priceCount: number;
+  connectionMethod?: 'websocket' | 'polling';
 }
 
 export function BinanceConnectionStatus({
@@ -30,7 +31,8 @@ export function BinanceConnectionStatus({
   connectionAttempts,
   maxAttempts,
   onReconnect,
-  priceCount
+  priceCount,
+  connectionMethod = 'websocket'
 }: BinanceConnectionStatusProps) {
   const getStatusColor = () => {
     if (error) return 'text-red-600';
@@ -40,9 +42,12 @@ export function BinanceConnectionStatus({
 
   const getStatusText = () => {
     if (error) return 'Connection Error';
-    if (isConnected) return 'Connected to Binance';
+    if (isConnected) {
+      const method = connectionMethod === 'websocket' ? 'WebSocket' : 'REST API';
+      return `Live data via Binance ${method}`;
+    }
     if (connectionAttempts > 0) return `Reconnecting... (${connectionAttempts}/${maxAttempts})`;
-    return 'Connecting...';
+    return 'Connecting to Binance...';
   };
 
   const getStatusIcon = () => {
@@ -62,10 +67,22 @@ export function BinanceConnectionStatus({
             </div>
             
             {isConnected && (
-              <Badge variant="outline" className="text-xs">
-                <Activity className="w-3 h-3 mr-1" />
-                {priceCount} coins
-              </Badge>
+              <>
+                <Badge variant="outline" className="text-xs">
+                  <Activity className="w-3 h-3 mr-1" />
+                  {priceCount} coins
+                </Badge>
+                <Badge 
+                  variant={connectionMethod === 'websocket' ? 'default' : 'secondary'} 
+                  className="text-xs"
+                >
+                  {connectionMethod === 'websocket' ? 'Live' : 'Real-time API'}
+                </Badge>
+                <Badge variant="default" className="text-xs bg-green-600">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Verified
+                </Badge>
+              </>
             )}
           </div>
 

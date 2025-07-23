@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, BarChart3, ZoomIn, ZoomOut, RotateCcw, Candle } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, ZoomIn, ZoomOut, RotateCcw, Activity } from 'lucide-react';
 
 interface PriceChartProps {
   coinId: string;
@@ -41,7 +41,7 @@ interface ChartData {
   volume?: number;
 }
 
-export function PriceChart({ 
+export function EnhancedPriceChart({ 
   coinId, 
   currency, 
   coinName, 
@@ -56,6 +56,113 @@ export function PriceChart({
   const [zoomDomain, setZoomDomain] = useState<{ startIndex?: number; endIndex?: number }>({});
   const [showBrush, setShowBrush] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Custom Candlestick Component
+  const CandlestickBar = (props: any) => {
+    const { payload, x, y, width, height } = props;
+    if (!payload || !payload.open || !payload.high || !payload.low || !payload.close) {
+      return null;
+    }
+
+    const { open, high, low, close } = payload;
+    const isGreen = close >= open;
+    const color = isGreen ? '#10b981' : '#ef4444';
+    const fillColor = isGreen ? '#10b981' : '#ef4444';
+    
+    // Calculate positions for the candlestick
+    const yScale = height / (Math.max(high, open, close) - Math.min(low, open, close));
+    const wickX = x + width / 2;
+    
+    // Body dimensions
+    const bodyTop = Math.min(open, close);
+    const bodyHeight = Math.abs(close - open);
+    const bodyY = y + (Math.max(high, open, close) - Math.max(open, close)) * yScale;
+    
+    // Wick dimensions
+    const wickTop = y + (Math.max(high, open, close) - high) * yScale;
+    const wickBottom = y + (Math.max(high, open, close) - low) * yScale;
+    
+    return (
+      <g>
+        {/* High-Low Wick */}
+        <line
+          x1={wickX}
+          y1={wickTop}
+          x2={wickX}
+          y2={wickBottom}
+          stroke={color}
+          strokeWidth={1}
+        />
+        {/* Open-Close Body */}
+        <rect
+          x={x + width * 0.2}
+          y={bodyY}
+          width={width * 0.6}
+          height={Math.max(bodyHeight * yScale, 1)}
+          fill={isGreen ? 'none' : fillColor}
+          stroke={color}
+          strokeWidth={1.5}
+        />
+      </g>
+    );
+  };
+
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ value: number; payload?: any }>;
+    label?: string;
+  }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      
+      if (chartType === 'candles' && data?.open !== undefined) {
+        const isGreen = data.close >= data.open;
+        const change = ((data.close - data.open) / data.open * 100);
+        
+        return (
+          <div className="bg-background/95 backdrop-blur border rounded-lg p-3 shadow-lg min-w-48">
+            <p className="text-sm text-muted-foreground mb-2 font-medium">{label}</p>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-6">
+                <span className="text-muted-foreground">Open:</span>
+                <span className="font-medium">{formatCurrency(data.open, currency)}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-muted-foreground">High:</span>
+                <span className="font-medium text-green-600">{formatCurrency(data.high, currency)}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-muted-foreground">Low:</span>
+                <span className="font-medium text-red-600">{formatCurrency(data.low, currency)}</span>
+              </div>
+              <div className="flex justify-between gap-6">
+                <span className="text-muted-foreground">Close:</span>
+                <span className={`font-medium ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(data.close, currency)}
+                </span>
+              </div>
+              <div className="flex justify-between gap-6 pt-1.5 border-t">
+                <span className="text-muted-foreground">Change:</span>
+                <span className={`font-medium ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
+                  {isGreen ? '+' : ''}{change.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="bg-background/95 backdrop-blur border rounded-lg p-3 shadow-lg">
+            <p className="text-sm text-muted-foreground mb-1">{label}</p>
+            <p className="font-semibold text-lg">
+              {formatCurrency(payload[0].value, currency)}
+            </p>
+          </div>
+        );
+      }
+    }
+    return null;
+  };
 
   // Zoom functionality
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -92,7 +199,7 @@ export function PriceChart({
     const currentEnd = zoomDomain.endIndex || chartData.length - 1;
     const currentRange = currentEnd - currentStart;
     
-    if (currentRange <= 10) return; // Minimum zoom level
+    if (currentRange <= 10) return;
     
     const newRange = currentRange * 0.8;
     const center = (currentStart + currentEnd) / 2;
@@ -111,7 +218,7 @@ export function PriceChart({
     const currentEnd = zoomDomain.endIndex || chartData.length - 1;
     const currentRange = currentEnd - currentStart;
     
-    if (currentRange >= chartData.length - 1) return; // Maximum zoom level
+    if (currentRange >= chartData.length - 1) return;
     
     const newRange = Math.min(chartData.length, currentRange * 1.25);
     const center = (currentStart + currentEnd) / 2;
@@ -137,41 +244,45 @@ export function PriceChart({
     const fetchChartData = async () => {
       setIsLoading(true);
       try {
-        // For candlestick data, we need OHLC data from Binance or use CoinGecko's OHLC endpoint
         let formattedData: ChartData[] = [];
         
         if (chartType === 'candles') {
-          // Try to get OHLC data from CoinGecko
+          // Use our custom API endpoint for OHLC data
           try {
             const ohlcResponse = await fetch(
-              `https://api.coingecko.com/api/v3/coins/${coinId}/ohlc?vs_currency=${currency}&days=${timeframe}`
+              `/api/crypto/ohlc?coinId=${coinId}&currency=${currency}&days=${timeframe}`
             );
             
             if (ohlcResponse.ok) {
-              const ohlcData = await ohlcResponse.json();
-              formattedData = ohlcData.map(([timestamp, open, high, low, close]: [number, number, number, number, number]) => {
-                const date = new Date(timestamp);
-                return {
-                  timestamp,
-                  price: close,
-                  open,
-                  high,
-                  low,
-                  close,
-                  date: date.toLocaleDateString(),
-                  formattedDate: timeframe <= 1 
-                    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : timeframe <= 7
-                    ? date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-                    : date.toLocaleDateString([], { month: 'short', year: '2-digit' })
-                };
-              });
+              const result = await ohlcResponse.json();
+              if (result.success && result.data) {
+                formattedData = result.data.map((item: unknown) => {
+                  const date = new Date(item.timestamp);
+                  return {
+                    timestamp: item.timestamp,
+                    price: item.close,
+                    open: item.open,
+                    high: item.high,
+                    low: item.low,
+                    close: item.close,
+                    date: date.toLocaleDateString(),
+                    formattedDate: timeframe <= 1 
+                      ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : timeframe <= 7
+                      ? date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                      : date.toLocaleDateString([], { month: 'short', year: '2-digit' })
+                  };
+                });
+                console.log(`Loaded ${formattedData.length} OHLC data points from ${result.source}`);
+              } else {
+                throw new Error('Invalid OHLC response format');
+              }
             } else {
-              throw new Error('OHLC data not available');
+              throw new Error('OHLC API request failed');
             }
           } catch (ohlcError) {
-            console.warn('OHLC data not available, falling back to price data:', ohlcError);
-            // Fallback to regular price data and simulate OHLC
+            console.error('Failed to fetch OHLC data:', ohlcError);
+            // Fallback to regular price data
             const response = await fetch(
               `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=${currency}&days=${timeframe}`
             );
@@ -179,12 +290,13 @@ export function PriceChart({
             
             formattedData = (data.prices || []).map(([timestamp, price]: [number, number], index: number) => {
               const date = new Date(timestamp);
-              // Simulate OHLC data from price data (not ideal but functional)
-              const variation = price * 0.02; // 2% variation
+              const prevPrice = index > 0 ? data.prices[index - 1][1] : price;
+              const variation = price * 0.01;
+              
               return {
                 timestamp,
                 price,
-                open: index > 0 ? (data.prices[index - 1][1] || price) : price,
+                open: prevPrice,
                 high: price + Math.random() * variation,
                 low: price - Math.random() * variation,
                 close: price,
@@ -220,7 +332,6 @@ export function PriceChart({
         }
         
         setChartData(formattedData);
-        // Reset zoom when data changes
         setZoomDomain({});
       } catch (error) {
         console.error('Error fetching chart data:', error);
@@ -239,116 +350,6 @@ export function PriceChart({
     { label: '90D', value: 90 },
     { label: '1Y', value: 365 },
   ];
-
-  // Custom Candlestick Component
-  const CandlestickBar = (props: any) => {
-    const { payload, x, y, width, height } = props;
-    if (!payload || !payload.open || !payload.high || !payload.low || !payload.close) {
-      return null;
-    }
-
-    const { open, high, low, close } = payload;
-    const isGreen = close >= open;
-    const color = isGreen ? '#10b981' : '#ef4444';
-    const fillColor = isGreen ? '#10b981' : '#ef4444';
-    
-    // Calculate positions
-    const maxPrice = Math.max(high, open, close);
-    const minPrice = Math.min(low, open, close);
-    const priceRange = maxPrice - minPrice;
-    
-    if (priceRange === 0) return null;
-    
-    const scale = height / priceRange;
-    const wickX = x + width / 2;
-    
-    // Wick (high-low line)
-    const wickTop = y + (maxPrice - high) * scale;
-    const wickBottom = y + (maxPrice - low) * scale;
-    
-    // Body (open-close rectangle)
-    const bodyTop = y + (maxPrice - Math.max(open, close)) * scale;
-    const bodyHeight = Math.abs(close - open) * scale;
-    
-    return (
-      <g>
-        {/* Wick */}
-        <line
-          x1={wickX}
-          y1={wickTop}
-          x2={wickX}
-          y2={wickBottom}
-          stroke={color}
-          strokeWidth={1}
-        />
-        {/* Body */}
-        <rect
-          x={x + width * 0.2}
-          y={bodyTop}
-          width={width * 0.6}
-          height={Math.max(bodyHeight, 1)}
-          fill={isGreen ? 'none' : fillColor}
-          stroke={color}
-          strokeWidth={1}
-        />
-      </g>
-    );
-  };
-
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean;
-    payload?: Array<{ value: number; payload?: any }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      
-      if (chartType === 'candles' && data?.open !== undefined) {
-        const isGreen = data.close >= data.open;
-        return (
-          <div className="bg-background/95 backdrop-blur border rounded-lg p-3 shadow-lg">
-            <p className="text-sm text-muted-foreground mb-2">{label}</p>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Open:</span>
-                <span className="font-medium">{formatCurrency(data.open, currency)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">High:</span>
-                <span className="font-medium text-green-600">{formatCurrency(data.high, currency)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Low:</span>
-                <span className="font-medium text-red-600">{formatCurrency(data.low, currency)}</span>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Close:</span>
-                <span className={`font-medium ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(data.close, currency)}
-                </span>
-              </div>
-              <div className="flex justify-between gap-4 pt-1 border-t">
-                <span className="text-muted-foreground">Change:</span>
-                <span className={`font-medium ${isGreen ? 'text-green-600' : 'text-red-600'}`}>
-                  {isGreen ? '+' : ''}{((data.close - data.open) / data.open * 100).toFixed(2)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-      } else {
-        return (
-          <div className="bg-background/95 backdrop-blur border rounded-lg p-3 shadow-lg">
-            <p className="text-sm text-muted-foreground mb-1">{label}</p>
-            <p className="font-semibold text-lg">
-              {formatCurrency(payload[0].value, currency)}
-            </p>
-          </div>
-        );
-      }
-    }
-    return null;
-  };
 
   const isPositive = priceChange24h ? priceChange24h >= 0 : true;
   const chartColor = isPositive ? '#10b981' : '#ef4444';
@@ -426,7 +427,7 @@ export function PriceChart({
               size="sm"
               onClick={() => setChartType('candles')}
             >
-              <Candle className="w-4 h-4 mr-1" />
+              <Activity className="w-4 h-4 mr-1" />
               Candles
             </Button>
           </div>
@@ -519,9 +520,9 @@ export function PriceChart({
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => {
-                      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                      if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-                      return `$${value.toFixed(2)}`;
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                      return `${value.toFixed(2)}`;
                     }}
                   />
                   <Tooltip content={<CustomTooltip />} />
@@ -552,6 +553,50 @@ export function PriceChart({
                     />
                   )}
                 </AreaChart>
+              ) : chartType === 'candles' ? (
+                <ComposedChart data={zoomedData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
+                  <XAxis
+                    dataKey="formattedDate"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    domain={['dataMin - 2', 'dataMax + 2']}
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => {
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                      return `${value.toFixed(2)}`;
+                    }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="high"
+                    shape={<CandlestickBar />}
+                    fill="transparent"
+                  />
+                  {showBrush && (
+                    <Brush
+                      dataKey="formattedDate"
+                      height={30}
+                      stroke="#666"
+                      fill="#666"
+                      fillOpacity={0.1}
+                      onChange={(brushData) => {
+                        if (brushData && brushData.startIndex !== undefined && brushData.endIndex !== undefined) {
+                          setZoomDomain({
+                            startIndex: brushData.startIndex,
+                            endIndex: brushData.endIndex
+                          });
+                        }
+                      }}
+                    />
+                  )}
+                </ComposedChart>
               ) : (
                 <LineChart data={zoomedData}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
@@ -566,9 +611,9 @@ export function PriceChart({
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => {
-                      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                      if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-                      return `$${value.toFixed(2)}`;
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                      return `${value.toFixed(2)}`;
                     }}
                   />
                   <Tooltip content={<CustomTooltip />} />
@@ -601,9 +646,14 @@ export function PriceChart({
               )}
             </ResponsiveContainer>
             
+            {/* Chart Type Indicator */}
+            <div className="absolute top-2 left-2 bg-background/90 backdrop-blur border rounded px-2 py-1 text-xs text-muted-foreground">
+              {chartType === 'candles' ? '🕯️ Candlestick' : chartType === 'area' ? '📊 Area' : '📈 Line'} Chart
+            </div>
+            
             {/* Zoom indicator */}
             {(zoomDomain.startIndex !== undefined || zoomDomain.endIndex !== undefined) && (
-              <div className="absolute top-2 left-2 bg-background/90 backdrop-blur border rounded px-2 py-1 text-xs text-muted-foreground">
+              <div className="absolute top-2 right-2 bg-background/90 backdrop-blur border rounded px-2 py-1 text-xs text-muted-foreground">
                 Zoomed View
               </div>
             )}

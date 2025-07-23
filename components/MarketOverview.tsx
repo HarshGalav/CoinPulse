@@ -11,7 +11,7 @@ import {
   cn,
 } from "@/lib/utils";
 import { CoinData } from "@/lib/coingecko";
-import { useRealBinanceWebSocket } from "@/lib/real-binance-websocket";
+import { useSimpleCrypto } from "@/lib/hooks/use-simple-crypto";
 import {
   TrendingUp,
   TrendingDown,
@@ -48,14 +48,15 @@ export function MarketOverview({
     marketCapChange24h: 0,
   });
 
-  // Use real Binance WebSocket for live cryptocurrency data
+  // Use stable real-time data store
   const {
-    prices: realtimePrices,
+    allPrices: realtimePrices,
     isConnected,
     lastUpdate,
     error,
-    reconnect
-  } = useRealBinanceWebSocket();
+    reconnect,
+    connectionMethod,
+  } = useSimpleCrypto({ autoStart: false }); // Don't auto-start, let main page control it
 
   // Merge real-time prices with coin data using useMemo to prevent infinite loops
   const mergedCoins = useMemo(() => {

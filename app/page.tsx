@@ -5,20 +5,20 @@ import { useSession } from 'next-auth/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PriceChart } from '@/components/PriceChart';
+import { SimpleCandlestickChart } from '@/components/SimpleCandlestickChart';
+import { SimpleStoreDebugger } from '@/components/debug/SimpleStoreDebugger';
 import { AlertDialog } from '@/components/AlertDialog';
 import { LandingPage } from '@/components/LandingPage';
 import { Navbar } from '@/components/Navbar';
 import { MarketOverview } from '@/components/MarketOverview';
 import { BinanceConnectionStatus } from '@/components/BinanceConnectionStatus';
 import { CoinData } from '@/lib/coingecko';
-import { useRealBinanceWebSocket } from '@/lib/real-binance-websocket';
+import { useSimpleCrypto } from '@/lib/hooks/use-simple-crypto';
 import { 
   RefreshCw,
   X,
   Filter,
   Wifi,
-  WifiOff,
   Zap,
   Activity
 } from 'lucide-react';
@@ -80,16 +80,18 @@ export default function Home() {
 
 
 
-  // Real Binance WebSocket for live cryptocurrency data
+  // Stable real-time data store (single WebSocket connection)
   const { 
-    prices: binancePrices, 
+    allPrices: binancePrices, 
     isConnected: binanceConnected, 
     lastUpdate: binanceLastUpdate, 
     error: binanceError,
     reconnect: binanceReconnect,
     connectionAttempts,
-    maxAttempts
-  } = useRealBinanceWebSocket();
+    maxAttempts,
+    connectionMethod,
+    updateCount
+  } = useSimpleCrypto();
 
   const applyFilters = useCallback((coinData: CoinData[], filter: string) => {
     if (!Array.isArray(coinData)) {
@@ -401,6 +403,7 @@ export default function Home() {
               maxAttempts={maxAttempts}
               onReconnect={binanceReconnect}
               priceCount={binancePrices.length}
+              connectionMethod={connectionMethod}
             />
           </div>
         )}
@@ -473,7 +476,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="p-6">
-                <PriceChart
+                <SimpleCandlestickChart
                   coinId={selectedCoin.id}
                   currency={selectedCurrency}
                   coinName={selectedCoin.name}
@@ -498,6 +501,9 @@ export default function Home() {
           />
         )}
       </main>
+      
+      {/* Debug component for development */}
+      {process.env.NODE_ENV === 'development' && <SimpleStoreDebugger />}
     </div>
   );
 }
