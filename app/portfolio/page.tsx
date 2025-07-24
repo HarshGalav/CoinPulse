@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/Navbar";
+import { useFirebaseAlerts } from "@/lib/hooks/use-firebase-alerts";
 import { formatCurrency, formatPercentage, cn } from "@/lib/utils";
 import {
   Plus,
@@ -38,6 +39,7 @@ interface PortfolioHolding {
 
 interface Alert {
   id: string;
+  userId: string;
   coinId: string;
   coinName: string;
   coinSymbol: string;
@@ -46,42 +48,29 @@ interface Alert {
   currency: string;
   isRecurring: boolean;
   isActive: boolean;
+  useLiveData?: boolean;
+  currentPrice?: number;
   createdAt: string;
+  updatedAt?: string;
+  triggeredAt?: string | null;
+  lastTriggeredPrice?: number | null;
+  lastDataSource?: string | null;
+  triggerCount?: number;
 }
 
 export default function PortfolioPage() {
   const { data: session, status } = useSession();
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [totalValue, setTotalValue] = useState(0);
   const [totalPnL, setTotalPnL] = useState(0);
   const [totalPnLPercentage, setTotalPnLPercentage] = useState(0);
 
-  // Fetch alerts from API
-  const fetchAlerts = async () => {
-    try {
-      const response = await fetch("/api/alerts");
-      if (response.ok) {
-        const alertsData = await response.json();
-        setAlerts(alertsData);
-      }
-    } catch (error) {
-      console.error("Error fetching alerts:", error);
-    }
-  };
+  // Use Firebase alerts hook
+  const { alerts, deleteAlert: deleteAlertFromStore } = useFirebaseAlerts();
 
-  // Delete alert
+  // Delete alert using Firebase store
   const deleteAlert = async (alertId: string) => {
-    try {
-      const response = await fetch(`/api/alerts?id=${alertId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setAlerts(alerts.filter((alert) => alert.id !== alertId));
-      }
-    } catch (error) {
-      console.error("Error deleting alert:", error);
-    }
+    await deleteAlertFromStore(alertId);
   };
 
   // Mock portfolio data - in real app, this would come from your database

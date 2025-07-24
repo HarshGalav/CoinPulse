@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
 
-// Simple in-memory storage for alerts (for demo purposes)
-// In production, you'd use a proper database
-const alertsStorage = new Map<string, any[]>();
-
+// Since we're using client-side localStorage, the server just returns empty
+// The actual data will be managed on the client side
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Return empty array - client will load from localStorage
+    return NextResponse.json({
+      success: true,
+      alerts: [],
+      count: 0,
+      message: 'Using client-side storage'
+    });
 
-    const userAlerts = alertsStorage.get(session.user.email) || [];
-    return NextResponse.json(userAlerts);
   } catch (error) {
-    console.error('Error fetching alerts:', error);
+    console.error('Error in alerts API:', error);
     return NextResponse.json(
       { error: 'Failed to fetch alerts' },
       { status: 500 }
@@ -27,40 +23,35 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { coinId, coinName, coinSymbol, targetPrice, condition, isRecurring, currency } = body;
-
-    if (!coinId || !targetPrice || !condition) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const alertData = {
-      id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userEmail: session.user.email,
+    const {
       coinId,
       coinName,
       coinSymbol,
-      targetPrice: parseFloat(targetPrice),
-      condition, // 'above' or 'below'
-      isRecurring: isRecurring || false,
-      currency: currency || 'usd',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      triggeredAt: null,
-    };
+      targetPrice,
+      condition,
+      isRecurring,
+      currency,
+      useLiveData,
+      currentPrice
+    } = await request.json();
 
-    // Store in memory (for demo)
-    const userAlerts = alertsStorage.get(session.user.email) || [];
-    userAlerts.push(alertData);
-    alertsStorage.set(session.user.email, userAlerts);
-    
-    return NextResponse.json(alertData);
+    if (!coinId || !coinName || !coinSymbol || !targetPrice || !condition || !currency) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // For now, we'll simulate creating an alert
+    // In a real implementation, this would save to a database
+    const alertId = `alert-${Date.now()}`;
+
+    return NextResponse.json({
+      success: true,
+      alertId,
+      message: 'Alert created successfully (demo mode)'
+    });
+
   } catch (error) {
     console.error('Error creating alert:', error);
     return NextResponse.json(
@@ -72,30 +63,23 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const alertId = searchParams.get('id');
 
     if (!alertId) {
-      return NextResponse.json({ error: 'Alert ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Alert ID is required' },
+        { status: 400 }
+      );
     }
 
-    const userAlerts = alertsStorage.get(session.user.email) || [];
-    const alertIndex = userAlerts.findIndex(alert => alert.id === alertId);
+    // For now, we'll simulate deleting an alert
+    // In a real implementation, this would delete from a database
+    return NextResponse.json({
+      success: true,
+      message: 'Alert deleted successfully (demo mode)'
+    });
 
-    if (alertIndex === -1) {
-      return NextResponse.json({ error: 'Alert not found' }, { status: 404 });
-    }
-
-    userAlerts.splice(alertIndex, 1);
-    alertsStorage.set(session.user.email, userAlerts);
-    
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting alert:', error);
     return NextResponse.json(

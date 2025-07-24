@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import {
   cn,
 } from "@/lib/utils";
 import { CoinData } from "@/lib/coingecko";
-import { useSimpleCrypto } from "@/lib/hooks/use-simple-crypto";
+import { useBinanceConnectionStatus } from "@/lib/hooks/use-binance-comprehensive";
 import {
   TrendingUp,
   TrendingDown,
@@ -26,11 +26,19 @@ import {
   WifiOff,
 } from "lucide-react";
 
+interface RealtimeStats {
+  totalCoins: number;
+  realtimeCoins: number;
+  coverage: number;
+  isEnabled: boolean;
+}
+
 interface MarketOverviewProps {
   coins: CoinData[];
   currency: string;
   isLoading: boolean;
   onCoinSelect: (coin: CoinData) => void;
+  realtimeStats?: RealtimeStats;
 }
 
 export function MarketOverview({
@@ -38,66 +46,55 @@ export function MarketOverview({
   currency,
   isLoading,
   onCoinSelect,
+  realtimeStats,
 }: MarketOverviewProps) {
-  const [globalStats, setGlobalStats] = useState({
-    totalMarketCap: 0,
-    totalVolume: 0,
-    btcDominance: 0,
-    activeCoins: 0,
-    markets: 0,
-    marketCapChange24h: 0,
-  });
 
-  // Use stable real-time data store
+  // Get Binance connection status for display
   const {
-    allPrices: realtimePrices,
     isConnected,
     lastUpdate,
-    error,
-    reconnect,
-    connectionMethod,
-  } = useSimpleCrypto({ autoStart: false }); // Don't auto-start, let main page control it
+    mappedCoins,
+    availableSymbols,
+    coverage,
+  } = useBinanceConnectionStatus();
 
-  // Merge real-time prices with coin data using useMemo to prevent infinite loops
-  const mergedCoins = useMemo(() => {
-    return coins.map((coin) => {
-      const realtimePrice = realtimePrices.find((p) => p.id === coin.id);
-      if (realtimePrice) {
-        return {
-          ...coin,
-          current_price: realtimePrice.current_price,
-          price_change_percentage_24h:
-            realtimePrice.price_change_percentage_24h,
-        };
-      }
-      return coin;
-    });
-  }, [coins, realtimePrices]);
+  // Use coins directly since they're already merged with real-time data from parent
+  const mergedCoins = coins;
 
-  useEffect(() => {
-    if (mergedCoins.length > 0) {
-      const totalMarketCap = mergedCoins.reduce(
-        (sum, coin) => sum + (coin.market_cap || 0),
-        0
-      );
-      const totalVolume = mergedCoins.reduce(
-        (sum, coin) => sum + (coin.total_volume || 0),
-        0
-      );
-      const btcMarketCap =
-        mergedCoins.find((coin) => coin.symbol === "btc")?.market_cap || 0;
-      const btcDominance =
-        totalMarketCap > 0 ? (btcMarketCap / totalMarketCap) * 100 : 0;
-
-      setGlobalStats({
-        totalMarketCap,
-        totalVolume,
-        btcDominance,
-        activeCoins: mergedCoins.length,
-        markets: mergedCoins.length * 15, // Approximate based on typical exchange listings
-        marketCapChange24h: 0, // Will be calculated from real data when available
-      });
+  // Calculate global stats using useMemo to prevent recalculation on every render
+  const globalStats = useMemo(() => {
+    if (mergedCoins.length === 0) {
+      return {
+        totalMarketCap: 0,
+        totalVolume: 0,
+        btcDominance: 0,
+        activeCoins: 0,
+        markets: 0,
+        marketCapChange24h: 0,
+      };
     }
+
+    const totalMarketCap = mergedCoins.reduce(
+      (sum, coin) => sum + (coin.market_cap || 0),
+      0
+    );
+    const totalVolume = mergedCoins.reduce(
+      (sum, coin) => sum + (coin.total_volume || 0),
+      0
+    );
+    const btcMarketCap =
+      mergedCoins.find((coin) => coin.symbol === "btc")?.market_cap || 0;
+    const btcDominance =
+      totalMarketCap > 0 ? (btcMarketCap / totalMarketCap) * 100 : 0;
+
+    return {
+      totalMarketCap,
+      totalVolume,
+      btcDominance,
+      activeCoins: mergedCoins.length,
+      markets: mergedCoins.length * 15, // Approximate based on typical exchange listings
+      marketCapChange24h: 0, // Will be calculated from real data when available
+    };
   }, [mergedCoins]);
 
   if (isLoading) {
@@ -244,6 +241,17 @@ export function MarketOverview({
                 )}
                 {isConnected ? "Live Data" : "Offline"}
               </Badge>
+              {realtimeStats && realtimeStats.isEnabled && (
+                <Badge variant="outline" className="text-xs">
+                  <Activity className="w-3 h-3 mr-1" />
+                  Binance: {mappedCoins} live ({coverage.toFixed(0)}%)
+                </Badge>
+              )}
+              {availableSymbols > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {availableSymbols.toLocaleString()} symbols available
+                </Badge>
+              )}
               {isConnected && (
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               )}

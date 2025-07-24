@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SimpleCandlestickChart } from '@/components/SimpleCandlestickChart';
+import { LiveCandlestickChart } from '@/components/LiveCandlestickChart';
 import { SimpleStoreDebugger } from '@/components/debug/SimpleStoreDebugger';
+import { BinanceDebugger } from '@/components/debug/BinanceDebugger';
 import { AlertDialog } from '@/components/AlertDialog';
 import { LandingPage } from '@/components/LandingPage';
 import { Navbar } from '@/components/Navbar';
 import { MarketOverview } from '@/components/MarketOverview';
 import { BinanceConnectionStatus } from '@/components/BinanceConnectionStatus';
+import { BinanceConnectionTest } from '@/components/debug/BinanceConnectionTest';
 import { CoinData } from '@/lib/coingecko';
-import { useSimpleCrypto } from '@/lib/hooks/use-simple-crypto';
+import { useBinanceComprehensive } from '@/lib/hooks/use-binance-comprehensive';
 import { 
   RefreshCw,
   X,
@@ -80,9 +83,10 @@ export default function Home() {
 
 
 
-  // Stable real-time data store (single WebSocket connection)
+  // Comprehensive Binance real-time data system
   const { 
-    allPrices: binancePrices, 
+    allPrices: realtimePrices, 
+    mergedCoins,
     isConnected: binanceConnected, 
     lastUpdate: binanceLastUpdate, 
     error: binanceError,
@@ -90,8 +94,16 @@ export default function Home() {
     connectionAttempts,
     maxAttempts,
     connectionMethod,
-    updateCount
-  } = useSimpleCrypto();
+    updateCount,
+    totalCoins,
+    mappedCoins,
+    availableSymbols,
+    coverage,
+    getMappingInfo
+  } = useBinanceComprehensive({ 
+    coins: filteredCoins,
+    autoStart: realtimeEnabled 
+  });
 
   const applyFilters = useCallback((coinData: CoinData[], filter: string) => {
     if (!Array.isArray(coinData)) {
@@ -392,7 +404,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Binance WebSocket Connection Status */}
+        {/* Debug Component - Remove after testing */}
+        <BinanceConnectionTest />
+
+        {/* Comprehensive Binance Real-time Status */}
         {realtimeEnabled && (
           <div className="mb-6">
             <BinanceConnectionStatus
@@ -402,18 +417,50 @@ export default function Home() {
               connectionAttempts={connectionAttempts}
               maxAttempts={maxAttempts}
               onReconnect={binanceReconnect}
-              priceCount={binancePrices.length}
+              priceCount={mappedCoins}
               connectionMethod={connectionMethod}
             />
+            
+            {/* Comprehensive coverage indicator */}
+            <div className="mt-2 space-y-1">
+              <div className="text-sm text-muted-foreground text-center">
+                <span className="font-medium text-green-600">
+                  Binance Real-time: {mappedCoins}/{totalCoins} coins ({coverage.toFixed(1)}%)
+                </span>
+                {availableSymbols > 0 && (
+                  <span className="ml-2 text-xs">
+                    • {availableSymbols} symbols available, {mappedCoins} mapped
+                  </span>
+                )}
+              </div>
+              
+              {(totalCoins - mappedCoins) > 0 && (
+                <div className="text-xs text-yellow-600 text-center">
+                  {totalCoins - mappedCoins} coins not available on Binance (will use static CoinGecko data)
+                </div>
+              )}
+              
+              {coverage === 100 && (
+                <div className="text-xs text-green-600 text-center font-medium">
+                  ✅ All coins have real-time Binance data!
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Market Overview */}
         <MarketOverview
-          coins={filteredCoins}
+          coins={realtimeEnabled ? mergedCoins : filteredCoins}
           currency={selectedCurrency}
           isLoading={isLoading}
           onCoinSelect={handleViewDetails}
+          realtimeStats={{
+            totalCoins,
+            realtimeCoins: mappedCoins,
+            coverage,
+            isEnabled: realtimeEnabled
+          }}
         />
 
         {/* Pagination */}
@@ -476,13 +523,14 @@ export default function Home() {
                 </div>
               </div>
               <div className="p-6">
-                <SimpleCandlestickChart
+                <LiveCandlestickChart
                   coinId={selectedCoin.id}
                   currency={selectedCurrency}
                   coinName={selectedCoin.name}
                   coinImage={selectedCoin.image}
                   currentPrice={selectedCoin.current_price}
                   priceChange24h={selectedCoin.price_change_percentage_24h}
+                  isLiveDataEnabled={realtimeEnabled}
                 />
               </div>
             </div>
@@ -498,12 +546,18 @@ export default function Home() {
             onAlertCreated={() => {
               toast.success('Price alert created successfully!');
             }}
+            isLiveDataEnabled={realtimeEnabled}
           />
         )}
       </main>
       
-      {/* Debug component for development */}
-      {process.env.NODE_ENV === 'development' && <SimpleStoreDebugger />}
+      {/* Debug components for development */}
+      {process.env.NODE_ENV === 'development' && (
+        <>
+          <SimpleStoreDebugger />
+          <BinanceDebugger />
+        </>
+      )}
     </div>
   );
 }

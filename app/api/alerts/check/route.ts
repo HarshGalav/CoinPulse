@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { coingeckoApi } from '@/lib/coingecko';
+import { livePriceService } from '@/lib/services/live-price-service';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -26,6 +27,8 @@ export async function POST() {
       isActive: boolean;
       isRecurring: boolean;
       userEmail: string;
+      useLiveData?: boolean;
+      currentPrice?: number;
     }
 
     const alerts: Alert[] = snapshot.docs.map(doc => ({
@@ -40,12 +43,16 @@ export async function POST() {
     const triggeredAlerts = [];
 
     for (const currency of currencies) {
-      const prices = await coingeckoApi.getSimplePrices(coinIds, currency);
+      // Get live prices (uses Binance when available, falls back to CoinGecko)
+      const livePrices = await livePriceService.getLivePrices(coinIds, currency);
       
       for (const alert of alerts.filter(a => a.currency === currency)) {
-        const currentPrice = prices[alert.coinId]?.[currency];
+        const livePrice = livePrices[alert.coinId];
         
-        if (!currentPrice) continue;
+        if (!livePrice) continue;
+        
+        const currentPrice = livePrice.price;
+        const dataSource = livePrice.source;
 
         const shouldTrigger = 
           (alert.condition === 'above' && currentPrice >= alert.targetPrice) ||
@@ -55,11 +62,16 @@ export async function POST() {
           triggeredAlerts.push({
             ...alert,
             currentPrice,
+            dataSource,
             triggeredAt: new Date().toISOString()
           });
 
           // Send email notification
           try {
+            const dataSourceBadge = dataSource === 'binance' 
+              ? '<span style="background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">🔴 LIVE</span>'
+              : '<span style="background: #6b7280; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px;">STATIC</span>';
+              
             await resend.emails.send({
               from: 'Crypto Tracker <alerts@yourdomain.com>',
               to: [alert.userEmail],
@@ -68,10 +80,16 @@ export async function POST() {
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                   <h2 style="color: #1f2937;">Price Alert Triggered!</h2>
                   <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin: 0 0 10px 0;">${alert.coinName} (${alert.coinSymbol.toUpperCase()})</h3>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                      <h3 style="margin: 0;">${alert.coinName} (${alert.coinSymbol.toUpperCase()})</h3>
+                      ${dataSourceBadge}
+                    </div>
                     <p style="margin: 5px 0;"><strong>Target Price:</strong> ${new Intl.NumberFormat('en-US', { style: 'currency', currency: alert.currency }).format(alert.targetPrice)}</p>
                     <p style="margin: 5px 0;"><strong>Current Price:</strong> ${new Intl.NumberFormat('en-US', { style: 'currency', currency: alert.currency }).format(currentPrice)}</p>
                     <p style="margin: 5px 0;"><strong>Condition:</strong> Price went ${alert.condition} target</p>
+                    <p style="margin: 5px 0; font-size: 12px; color: #6b7280;">
+                      <strong>Data Source:</strong> ${dataSource === 'binance' ? 'Binance (Live)' : 'CoinGecko (Static)'}
+                    </p>
                   </div>
                   <p>This alert was triggered on ${new Date().toLocaleString()}.</p>
                   <p><a href="${process.env.NEXTAUTH_URL}" style="color: #3b82f6;">View your dashboard</a></p>
@@ -89,14 +107,16 @@ export async function POST() {
             // For recurring alerts, just update the triggered timestamp
             await alertRef.update({
               triggeredAt: new Date().toISOString(),
-              lastTriggeredPrice: currentPrice
+              lastTriggeredPrice: currentPrice,
+              lastDataSource: dataSource
             });
           } else {
             // For one-time alerts, deactivate them
             await alertRef.update({
               isActive: false,
               triggeredAt: new Date().toISOString(),
-              lastTriggeredPrice: currentPrice
+              lastTriggeredPrice: currentPrice,
+              lastDataSource: dataSource
             });
           }
 
@@ -111,6 +131,7 @@ export async function POST() {
             currentPrice,
             condition: alert.condition,
             currency: alert.currency,
+            dataSource,
             triggeredAt: new Date().toISOString(),
             type: 'price_alert'
           });

@@ -2,13 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   TrendingUp, 
-  Moon, 
-  Sun, 
   User, 
   LogOut, 
   Menu, 
@@ -25,7 +23,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 interface NavbarProps {
-  currentPage?: 'markets' | 'portfolio' | 'news' | 'tools' | 'watchlist';
+  currentPage?: 'markets' | 'portfolio' | 'alerts' | 'news' | 'tools' | 'watchlist';
   onCoinSelect?: (coinId: string) => void;
   availableCoins?: Array<{
     id: string;
@@ -51,7 +49,6 @@ const POPULAR_CRYPTOS = [
 
 export function Navbar({ currentPage = 'markets', onCoinSelect, availableCoins = [] }: NavbarProps) {
   const { data: session } = useSession();
-  const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<typeof POPULAR_CRYPTOS>([]);
@@ -62,6 +59,7 @@ export function Navbar({ currentPage = 'markets', onCoinSelect, availableCoins =
   const navigationItems = [
     { id: 'markets', label: 'Markets', icon: BarChart3, href: '/' },
     { id: 'portfolio', label: 'Portfolio', icon: Wallet, href: '/portfolio' },
+    { id: 'alerts', label: 'Alerts', icon: Bell, href: '/alerts' },
     { id: 'watchlist', label: 'Watchlist', icon: Star, href: '/watchlist' },
     { id: 'news', label: 'News', icon: Newspaper, href: '/news' },
     { id: 'tools', label: 'Tools', icon: Calculator, href: '/tools' },
@@ -223,19 +221,15 @@ export function Navbar({ currentPage = 'markets', onCoinSelect, availableCoins =
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </Button>
+            <ThemeToggle />
 
             {session ? (
               <div className="flex items-center space-x-3">
-                <Button variant="ghost" size="sm">
-                  <Bell className="w-4 h-4" />
-                </Button>
+                <Link href="/alerts">
+                  <Button variant="ghost" size="sm">
+                    <Bell className="w-4 h-4" />
+                  </Button>
+                </Link>
                 
                 <div className="flex items-center space-x-2">
                   {session.user?.image && (
